@@ -414,15 +414,64 @@ fn capitalized(name: &str) -> String {
     chars.next().map(|first| first.to_uppercase().chain(chars).collect()).unwrap_or_default()
 }
 
-/// Every model in the Linux catalog runs on the CPU.
-pub fn model_runs_here(_info: &ModelInfo) -> bool {
-    true
+/// A CPU model runs everywhere, a GPU model (`EngineKind::needs_gpu`) only with a usable Vulkan GPU.
+pub fn model_runs_here(info: &ModelInfo) -> bool {
+    !info.engine.needs_gpu() || vulkan_gpu().is_some()
+}
+
+/// Environment for the engine: the GPU that `vulkan_gpu` chose, for ggml. ggml's own default is the first
+/// GPU in the driver's list, which can be the integrated one. A user's own setting stays.
+pub fn engine_env() -> Vec<(String, String)> {
+    const VISIBLE: &str = "GGML_VK_VISIBLE_DEVICES";
+    match vulkan_gpu() {
+        Some(index) if std::env::var_os(VISIBLE).is_none() => vec![(VISIBLE.into(), index.to_string())],
+        _ => Vec::new(),
+    }
+}
+
+/// The Vulkan device for a GPU model, as its index in the driver's device list: the first discrete GPU,
+/// else the first integrated one. None without a Vulkan driver or with only CPU devices (Mesa's
+/// llvmpipe and lavapipe), where parakeet.cpp would run about ten times slower than a CPU model.
+fn vulkan_gpu() -> Option<u32> {
+    static GPU: std::sync::OnceLock<Option<u32>> = std::sync::OnceLock::new();
+    *GPU.get_or_init(|| {
+        let kinds = vulkan_device_types().unwrap_or_default();
+        let gpu = best_gpu(&kinds);
+        log::info!("Vulkan devices {kinds:?}, GPU for GPU models: {gpu:?}");
+        gpu
+    })
+}
+
+fn best_gpu(kinds: &[ash::vk::PhysicalDeviceType]) -> Option<u32> {
+    use ash::vk::PhysicalDeviceType as Kind;
+    [Kind::DISCRETE_GPU, Kind::INTEGRATED_GPU]
+        .iter()
+        .find_map(|want| kinds.iter().position(|k| k == want))
+        .and_then(|i| u32::try_from(i).ok())
+}
+
+/// The type of each Vulkan device, in the order that ggml's `GGML_VK_VISIBLE_DEVICES` counts them.
+fn vulkan_device_types() -> Option<Vec<ash::vk::PhysicalDeviceType>> {
+    // SAFETY: loads the system's libvulkan.so.1, whose entry points ash checks as it loads them.
+    let entry = unsafe { ash::Entry::load() }.ok()?;
+    let app = ash::vk::ApplicationInfo::default().api_version(ash::vk::API_VERSION_1_0);
+    // SAFETY: a valid create info with no layers or extensions; the instance is destroyed below.
+    let instance = unsafe { entry.create_instance(&ash::vk::InstanceCreateInfo::default().application_info(&app), None) }.ok()?;
+    // SAFETY: the instance is live; the device handles are used only before it is destroyed.
+    let kinds = unsafe {
+        let devices = instance.enumerate_physical_devices().unwrap_or_default();
+        let kinds = devices.iter().map(|d| instance.get_physical_device_properties(*d).device_type).collect();
+        instance.destroy_instance(None);
+        kinds
+    };
+    Some(kinds)
 }
 
 #[cfg(test)]
 mod tests {
     // Not `super::*`: that brings GPUI's own `test` macro into scope.
-    use super::passwd_name;
+    use super::{best_gpu, passwd_name};
+    use ash::vk::PhysicalDeviceType as Kind;
 
     #[test]
     fn name_is_the_full_name_or_the_username() {
@@ -430,5 +479,14 @@ mod tests {
         assert_eq!(passwd_name(passwd, 1000).as_deref(), Some("Ana Lima"));
         assert_eq!(passwd_name(passwd, 1001).as_deref(), Some("Bob"), "an empty GECOS gives the username");
         assert_eq!(passwd_name(passwd, 4242), None);
+    }
+
+    #[test]
+    fn a_discrete_gpu_comes_first_and_a_cpu_device_never_counts() {
+        assert_eq!(best_gpu(&[Kind::INTEGRATED_GPU, Kind::DISCRETE_GPU]), Some(1));
+        assert_eq!(best_gpu(&[Kind::CPU, Kind::INTEGRATED_GPU]), Some(1));
+        assert_eq!(best_gpu(&[Kind::CPU]), None, "llvmpipe or lavapipe only");
+        assert_eq!(best_gpu(&[Kind::VIRTUAL_GPU, Kind::OTHER]), None);
+        assert_eq!(best_gpu(&[]), None);
     }
 }

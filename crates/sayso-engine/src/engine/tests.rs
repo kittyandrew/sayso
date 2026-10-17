@@ -128,12 +128,18 @@ fn archive(name: &str, files: &[&str]) -> Vec<u8> {
 }
 
 /// Serves `/files/<name>.tar.bz2`. `/redirect/<name>` redirects there, as GitHub does.
+/// `/hf/<path>` serves the single files given as `<repo>/resolve/<revision>/<file>`.
 struct Server {
     base: String,
+    hf: String,
     requests: Arc<AtomicUsize>,
 }
 
 fn serve_archives(archives: Vec<(String, Vec<u8>)>) -> Server {
+    serve_files(archives, Vec::new())
+}
+
+fn serve_files(archives: Vec<(String, Vec<u8>)>, files: Vec<(String, Vec<u8>)>) -> Server {
     let server = tiny_http::Server::http("127.0.0.1:0").unwrap();
     let port = server.server_addr().to_ip().unwrap().port();
     let requests = Arc::new(AtomicUsize::new(0));
@@ -151,6 +157,7 @@ fn serve_archives(archives: Vec<(String, Vec<u8>)>) -> Server {
             let found = archives
                 .iter()
                 .find(|(name, _)| url == format!("/files/{name}.tar.bz2"))
+                .or_else(|| files.iter().find(|(path, _)| url == format!("/hf/{path}")))
                 .map(|(_, bytes)| bytes.clone());
             let _ = match found {
                 Some(bytes) => request.respond(tiny_http::Response::from_data(bytes)),
@@ -160,6 +167,7 @@ fn serve_archives(archives: Vec<(String, Vec<u8>)>) -> Server {
     });
     Server {
         base: format!("http://127.0.0.1:{port}/redirect"),
+        hf: format!("http://127.0.0.1:{port}/hf"),
         requests,
     }
 }
@@ -176,6 +184,10 @@ struct Harness {
 }
 
 fn harness(base_url: &str) -> Harness {
+    harness_with(base_url, base_url)
+}
+
+fn harness_with(base_url: &str, hf_url: &str) -> Harness {
     let dir = tempfile::tempdir().unwrap();
     let captured = Captured::default();
     let out = Arc::new(Output::new(Box::new(captured.clone())));
@@ -186,6 +198,7 @@ fn harness(base_url: &str) -> Harness {
     let config = Config {
         models_dir: dir.path().join("models"),
         base_url: base_url.to_string(),
+        hf_url: hf_url.to_string(),
         decode_interval: Duration::ZERO,
     };
     let engine = Arc::new(Engine::new(
@@ -380,6 +393,33 @@ fn a_model_goes_from_not_downloaded_to_ready_and_back() {
     assert!(!folder.exists());
     let reply = h.call(json!({"v": 1, "type": "list_models", "id": "l4", "models": [{"id": "m", "engine": engine}]}));
     assert_eq!(states(&reply), ["not_downloaded"]);
+}
+
+#[test]
+fn a_gguf_model_downloads_its_file_from_hugging_face() {
+    let preview = "sherpa-onnx-fake-stream";
+    let server = serve_files(
+        vec![(
+            preview.into(),
+            archive(preview, &["encoder.onnx", "decoder.onnx", "joiner.onnx", "tokens.txt"]),
+        )],
+        vec![("o/r/resolve/c0ffee/m.gguf".into(), b"gguf".to_vec())],
+    );
+    let h = harness_with(&server.base, &server.hf);
+    let engine = json!({"kind": "parakeet_cpp", "repo": "o/r", "revision": "c0ffee", "file": "m.gguf", "preview_archive": preview});
+
+    let reply = h.call(json!({"v": 1, "type": "download", "id": "d1", "model": "m", "engine": engine}));
+    assert_eq!(last(&reply), &json!({"v": 1, "type": "ok", "id": "d1"}));
+    assert_eq!(states(&reply).last().map(String::as_str), Some("downloaded"));
+    let folder = h.models_dir().join("m");
+    assert_eq!(std::fs::read(folder.join("m.gguf").join("m.gguf")).unwrap(), b"gguf");
+    assert!(folder.join(preview).join("tokens.txt").is_file());
+
+    // A file the repository does not have fails the download and marks nothing complete.
+    let missing = json!({"kind": "parakeet_cpp", "repo": "o/r", "revision": "c0ffee", "file": "gone.gguf", "preview_archive": preview});
+    let reply = h.call(json!({"v": 1, "type": "download", "id": "d2", "model": "n", "engine": missing}));
+    assert_eq!(last(&reply)["type"], "error");
+    assert!(!h.models_dir().join("n").join(".complete").exists());
 }
 
 #[test]

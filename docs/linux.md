@@ -209,6 +209,10 @@ A second `sayso` start without a command opens the Hub of the Sayso that runs.
 
 The Linux engine, `sayso-engine`, runs the models on the CPU with sherpa-onnx. The default model is Parakeet TDT v2 (English). It comes with Kroko, a small streaming model for the live preview. On an arm64 virtual machine, Parakeet TDT v2 took 170 ms for 8 s of speech and 590 ms for 29 s. The live preview changes about every 1.4 s.
 
+Fluid Speech Mini (English) runs on the GPU instead: parakeet.cpp runs FluidVoice's GGUF through Vulkan, so a GPU with a Vulkan driver works (NVIDIA, AMD, Intel). The Models page and onboarding show it only when Sayso finds one: a discrete GPU first, else an integrated one. Mesa's llvmpipe and lavapipe run on the CPU and do not count. Without a GPU the model also refuses to load, because parakeet.cpp on the CPU took 19 s for 58 s of speech. The live preview stays on Kroko.
+
+On an RTX 4070 the final pass took 77 ms for 5 s of speech and 347 ms for 58 s, and the engine held about 190 MB of memory. A small integrated GPU can be slower than the CPU models: the Radeon in a Ryzen 7 7700X took 4 s for the same 58 s. The first load after a new Sayso version or GPU driver takes about 14 s, while the driver compiles its shaders, so the first dictation does not wait for them. `GGML_VK_VISIBLE_DEVICES=1` picks the second GPU in the Vulkan device list.
+
 ## Files
 
 | Kind | Location |

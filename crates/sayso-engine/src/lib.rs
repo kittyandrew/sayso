@@ -21,6 +21,7 @@ pub mod audio;
 pub mod download;
 pub mod engine;
 pub mod layout;
+pub mod parakeet;
 pub mod partials;
 pub mod protocol;
 pub mod recognizer;

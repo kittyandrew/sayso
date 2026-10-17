@@ -14,7 +14,8 @@
 //!   `frontmost_app_is_fullscreen`, `focused_window_frame`, `install_global_click_monitor`, `MonitorToken`.
 //! - Tray: `Tray` (with [`TrayEvent`]).
 //! - Files and system: `open`, `reveal`, `audio_player`, `user_full_name`, `model_runs_here`,
-//!   `open_requested` (a second start of Sayso asked to open the Hub). Windows plays
+//!   `engine_env` (extra environment for the speech engine), `open_requested` (a second start of
+//!   Sayso asked to open the Hub). Windows plays
 //!   audio in its own process, so it has `play_wav` and `stop_wav` and no `audio_player`.
 //!
 //! Coordinates are global screen points with the origin at the bottom left of

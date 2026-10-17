@@ -124,12 +124,13 @@ fn remove_file_if_exists(path: &Path) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::spec::Recipe;
+    use crate::spec::{Recipe, Source};
 
     fn spec() -> ModelSpec {
         ModelSpec {
             recipe: Recipe::ParakeetTdt,
             archive: "main".into(),
+            source: Source::SherpaRelease,
             preview_archive: Some("preview".into()),
         }
     }

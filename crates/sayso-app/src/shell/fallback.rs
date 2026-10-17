@@ -153,6 +153,9 @@ pub fn user_full_name() -> Option<String> {
 pub fn model_runs_here(_info: &ModelInfo) -> bool {
     true
 }
+pub fn engine_env() -> Vec<(String, String)> {
+    Vec::new()
+}
 
 struct NoHotkeys(Receiver<HotkeyEvent>);
 

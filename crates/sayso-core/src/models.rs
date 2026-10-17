@@ -76,6 +76,12 @@ pub enum EngineKind {
     /// "moonshine". `preview_archive` is a streaming model that comes with it
     /// for the live preview.
     Sherpa { recipe: String, archive: String, preview_archive: Option<String> },
+    /// A Parakeet TDT GGUF in the Rust engine `sayso-engine` (Linux), run by
+    /// parakeet.cpp on the GPU through Vulkan; without a GPU it does not load.
+    /// `file` is in the Hugging Face repository `repo` at the commit `revision`.
+    /// `preview_archive` is a sherpa-onnx streaming model for the live preview,
+    /// as for `Sherpa`.
+    ParakeetCpp { repo: String, revision: String, file: String, preview_archive: Option<String> },
 }
 
 /// A group of models in the Models page.
@@ -95,6 +101,7 @@ impl EngineKind {
             EngineKind::Whisper { .. } | EngineKind::WhisperCpp { .. } => Family::Whisper,
             EngineKind::Sherpa { recipe, .. } if recipe.starts_with("parakeet") => Family::Parakeet,
             EngineKind::Sherpa { recipe, .. } if recipe == "whisper" => Family::Whisper,
+            EngineKind::ParakeetCpp { .. } => Family::Parakeet,
             EngineKind::Remote { .. } => Family::Cloud,
             _ => Family::Other,
         }
@@ -109,8 +116,15 @@ impl EngineKind {
             EngineKind::WhisperCpp { .. } => "whisper.cpp",
             EngineKind::Onnx { .. } => "ONNX Runtime",
             EngineKind::Sherpa { .. } => "sherpa-onnx",
+            EngineKind::ParakeetCpp { .. } => "parakeet.cpp",
             _ => "FluidAudio",
         }
+    }
+
+    /// The model runs only on a GPU: on Linux, a `ParakeetCpp` model. The app hides it on a computer
+    /// without a usable Vulkan GPU (`shell::model_runs_here`).
+    pub fn needs_gpu(&self) -> bool {
+        matches!(self, EngineKind::ParakeetCpp { .. })
     }
 }
 

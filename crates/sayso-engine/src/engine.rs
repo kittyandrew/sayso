@@ -16,7 +16,7 @@ use crate::layout;
 use crate::partials::Partials;
 use crate::protocol::{Output, PROTOCOL_VERSION, Request};
 use crate::recognizer::{LivePreview, Loaded, Loader, ModelDirs, PreviewStream};
-use crate::spec::ModelSpec;
+use crate::spec::{ModelSpec, Source};
 use crate::store::ModelStore;
 use anyhow::{Context, Result, anyhow, bail};
 use serde_json::{Value, json};
@@ -34,6 +34,8 @@ pub struct Config {
     pub models_dir: PathBuf,
     /// Where the archives come from. `SAYSO_MODELS_URL` overrides the sherpa-onnx release.
     pub base_url: String,
+    /// Where a GGUF file comes from. `SAYSO_HF_URL` overrides Hugging Face.
+    pub hf_url: String,
     /// Shortest time between two decodes of a live preview stream.
     pub decode_interval: Duration,
 }
@@ -44,9 +46,14 @@ impl Config {
             .ok()
             .filter(|v| !v.is_empty())
             .unwrap_or_else(|| download::DEFAULT_BASE_URL.to_string());
+        let hf_url = std::env::var("SAYSO_HF_URL")
+            .ok()
+            .filter(|v| !v.is_empty())
+            .unwrap_or_else(|| download::DEFAULT_HF_URL.to_string());
         Config {
             models_dir,
             base_url,
+            hf_url,
             decode_interval: Duration::from_millis(150),
         }
     }
@@ -241,13 +248,22 @@ impl Engine {
                 continue; // A complete archive from a download that stopped later.
             }
             let staging = self.store.staging_dir(model, archive)?;
-            let url = download::archive_url(&self.config.base_url, archive);
-            download::fetch_archive(&self.agent, &url, &staging, &dest, &mut |bytes| {
+            let mut on_bytes = |bytes| {
                 progress.add(bytes);
                 if progress.due(Instant::now()) {
                     self.report(id, model, progress, progress.fraction());
                 }
-            })?;
+            };
+            match &spec.source {
+                Source::HuggingFace { repo, revision, file } if archive == spec.archive => {
+                    let url = download::hf_file_url(&self.config.hf_url, repo, revision, file);
+                    download::fetch_file(&self.agent, &url, file, &staging, &dest, &mut on_bytes)?;
+                }
+                _ => {
+                    let url = download::archive_url(&self.config.base_url, archive);
+                    download::fetch_archive(&self.agent, &url, &staging, &dest, &mut on_bytes)?;
+                }
+            }
         }
         check_files(spec, &self.dirs(model, spec)?).map_err(|e| anyhow::Error::new(Incomplete(format!("{e:#}"))))?;
         self.store.mark_downloaded(model, spec)?;
@@ -318,7 +334,8 @@ impl Engine {
         let loaded = match result {
             Ok(loaded) => loaded,
             Err(e) => {
-                self.model_state(id, model, "failed", json!({ "message": format!("{e:#}"), "reason": "load_failed" }));
+                let reason = if e.is::<crate::parakeet::NoGpu>() { "no_gpu" } else { "load_failed" };
+                self.model_state(id, model, "failed", json!({ "message": format!("{e:#}"), "reason": reason }));
                 drop(busy);
                 release_free_memory(); // a load that fails late has freed what it allocated, into glibc
                 return Err(e);
