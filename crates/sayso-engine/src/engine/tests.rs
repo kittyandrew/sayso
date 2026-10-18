@@ -127,19 +127,14 @@ fn archive(name: &str, files: &[&str]) -> Vec<u8> {
     builder.into_inner().unwrap().finish().unwrap()
 }
 
-/// Serves `/files/<name>.tar.bz2`. `/redirect/<name>` redirects there, as GitHub does.
-/// `/hf/<path>` serves the single files given as `<repo>/resolve/<revision>/<file>`.
+/// Serves `/files/<name>.tar.bz2`, and a single file such as `<repo>/resolve/<revision>/<file>` at
+/// `/files/<path>`. `/redirect/<name>` redirects there, as GitHub and Hugging Face do.
 struct Server {
     base: String,
-    hf: String,
     requests: Arc<AtomicUsize>,
 }
 
 fn serve_archives(archives: Vec<(String, Vec<u8>)>) -> Server {
-    serve_files(archives, Vec::new())
-}
-
-fn serve_files(archives: Vec<(String, Vec<u8>)>, files: Vec<(String, Vec<u8>)>) -> Server {
     let server = tiny_http::Server::http("127.0.0.1:0").unwrap();
     let port = server.server_addr().to_ip().unwrap().port();
     let requests = Arc::new(AtomicUsize::new(0));
@@ -156,8 +151,7 @@ fn serve_files(archives: Vec<(String, Vec<u8>)>, files: Vec<(String, Vec<u8>)>) 
             }
             let found = archives
                 .iter()
-                .find(|(name, _)| url == format!("/files/{name}.tar.bz2"))
-                .or_else(|| files.iter().find(|(path, _)| url == format!("/hf/{path}")))
+                .find(|(name, _)| url == format!("/files/{name}.tar.bz2") || url == format!("/files/{name}"))
                 .map(|(_, bytes)| bytes.clone());
             let _ = match found {
                 Some(bytes) => request.respond(tiny_http::Response::from_data(bytes)),
@@ -167,7 +161,6 @@ fn serve_files(archives: Vec<(String, Vec<u8>)>, files: Vec<(String, Vec<u8>)>) 
     });
     Server {
         base: format!("http://127.0.0.1:{port}/redirect"),
-        hf: format!("http://127.0.0.1:{port}/hf"),
         requests,
     }
 }
@@ -184,10 +177,6 @@ struct Harness {
 }
 
 fn harness(base_url: &str) -> Harness {
-    harness_with(base_url, base_url)
-}
-
-fn harness_with(base_url: &str, hf_endpoint: &str) -> Harness {
     let dir = tempfile::tempdir().unwrap();
     let captured = Captured::default();
     let out = Arc::new(Output::new(Box::new(captured.clone())));
@@ -198,7 +187,7 @@ fn harness_with(base_url: &str, hf_endpoint: &str) -> Harness {
     let config = Config {
         models_dir: dir.path().join("models"),
         base_url: base_url.to_string(),
-        hf_endpoint: hf_endpoint.to_string(),
+        hf_endpoint: base_url.to_string(),
         decode_interval: Duration::ZERO,
     };
     let engine = Arc::new(Engine::new(
@@ -398,14 +387,11 @@ fn a_model_goes_from_not_downloaded_to_ready_and_back() {
 #[test]
 fn a_gguf_model_downloads_its_file_from_hugging_face() {
     let preview = "sherpa-onnx-fake-stream";
-    let server = serve_files(
-        vec![(
-            preview.into(),
-            archive(preview, &["encoder.onnx", "decoder.onnx", "joiner.onnx", "tokens.txt"]),
-        )],
-        vec![("o/r/resolve/c0ffee/m.gguf".into(), b"gguf".to_vec())],
-    );
-    let h = harness_with(&server.base, &server.hf);
+    let server = serve_archives(vec![
+        (preview.into(), archive(preview, &["encoder.onnx", "decoder.onnx", "joiner.onnx", "tokens.txt"])),
+        ("o/r/resolve/c0ffee/m.gguf".into(), b"gguf".to_vec()),
+    ]);
+    let h = harness(&server.base);
     let engine = json!({"kind": "parakeet_cpp", "repo": "o/r", "revision": "c0ffee", "file": "m.gguf", "preview_archive": preview});
 
     let reply = h.call(json!({"v": 1, "type": "download", "id": "d1", "model": "m", "engine": engine}));
@@ -424,14 +410,11 @@ fn a_gguf_model_downloads_its_file_from_hugging_face() {
 
 #[test]
 fn a_new_gguf_revision_downloads_again() {
-    let server = serve_files(
-        vec![],
-        vec![
-            ("o/r/resolve/c0ffee/m.gguf".into(), b"old".to_vec()),
-            ("o/r/resolve/beef/m.gguf".into(), b"new".to_vec()),
-        ],
-    );
-    let h = harness_with(&server.base, &server.hf);
+    let server = serve_archives(vec![
+        ("o/r/resolve/c0ffee/m.gguf".into(), b"old".to_vec()),
+        ("o/r/resolve/beef/m.gguf".into(), b"new".to_vec()),
+    ]);
+    let h = harness(&server.base);
     for (id, revision) in [("d1", "c0ffee"), ("d2", "beef")] {
         let engine = json!({"kind": "parakeet_cpp", "repo": "o/r", "revision": revision, "file": "m.gguf", "preview_archive": null});
         let reply = h.call(json!({"v": 1, "type": "download", "id": id, "model": "m", "engine": engine}));

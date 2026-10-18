@@ -30,7 +30,8 @@ mod parakeet_cpp {
         sha256: "a6544898a6721a9ab54a8af37362cb9a79a8b50feaf16a597091790a8874debe",
     };
 
-    /// parakeet.cpp's `third_party/ggml` submodule at that commit.
+    /// parakeet.cpp's `third_party/ggml` submodule at that commit. A new pin also updates the license copies
+    /// in `licenses/`, which the packages ship (scripts/bundle-linux.sh).
     const GGML: Archive = Archive {
         url: "https://github.com/ggml-org/ggml/archive/e705c5fed490514458bdd2eaddc43bd098fcce9b.tar.gz",
         sha256: "77eacb7cc20c2e47ffbaa5a69fe6f9fd9da0bea2a6431b7fae1a8283cb2c4e43",
