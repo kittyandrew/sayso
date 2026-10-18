@@ -38,8 +38,6 @@ pub enum OfflineFiles {
         merged_decoder: PathBuf,
         tokens: PathBuf,
     },
-    /// A whole model in one GGUF file, for parakeet.cpp.
-    Gguf { model: PathBuf },
     /// Moonshine v1: four models.
     MoonshineV1 {
         preprocessor: PathBuf,
@@ -110,14 +108,6 @@ impl Listing {
             .with_context(|| format!("no {part} model file in {}", self.dir.display()))
     }
 
-    fn gguf(&self) -> Result<PathBuf> {
-        self.files
-            .iter()
-            .find(|p| Self::name(p).ends_with(".gguf"))
-            .cloned()
-            .with_context(|| format!("no .gguf model file in {}", self.dir.display()))
-    }
-
     fn tokens(&self) -> Result<PathBuf> {
         self.files
             .iter()
@@ -129,9 +119,6 @@ impl Listing {
 
 pub fn offline_files(recipe: Recipe, dir: &Path) -> Result<OfflineFiles> {
     let list = Listing::read(dir)?;
-    if recipe == Recipe::ParakeetGguf {
-        return Ok(OfflineFiles::Gguf { model: list.gguf()? }); // the vocabulary is inside the file
-    }
     let tokens = list.tokens()?;
     Ok(match recipe {
         Recipe::ParakeetTdt | Recipe::ParakeetTdtCtc => {
@@ -177,7 +164,7 @@ pub fn offline_files(recipe: Recipe, dir: &Path) -> Result<OfflineFiles> {
             },
         },
         Recipe::ZipformerStreaming => bail!("a streaming model has no final pass"),
-        Recipe::ParakeetGguf => unreachable!("returned above"),
+        Recipe::ParakeetGguf => bail!("parakeet.cpp loads a GGUF model"),
     })
 }
 
@@ -287,21 +274,6 @@ mod tests {
         };
         assert!(uncached_decoder.ends_with("uncached_decode.int8.onnx"));
         assert!(cached_decoder.ends_with("cached_decode.int8.onnx"));
-    }
-
-    #[test]
-    fn gguf_needs_no_tokens_file() {
-        let dir = folder(&["fluid-speech-mini-q2k-q4k.gguf", "README.md"]);
-        let files = offline_files(Recipe::ParakeetGguf, dir.path()).unwrap();
-        assert_eq!(
-            files,
-            OfflineFiles::Gguf {
-                model: dir.path().join("fluid-speech-mini-q2k-q4k.gguf")
-            }
-        );
-        let dir = folder(&["model.onnx", "tokens.txt"]);
-        let error = offline_files(Recipe::ParakeetGguf, dir.path()).unwrap_err().to_string();
-        assert!(error.starts_with("no .gguf model file"), "{error}");
     }
 
     #[test]

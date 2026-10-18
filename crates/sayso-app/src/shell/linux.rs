@@ -414,7 +414,7 @@ fn capitalized(name: &str) -> String {
     chars.next().map(|first| first.to_uppercase().chain(chars).collect()).unwrap_or_default()
 }
 
-/// A CPU model runs everywhere, a GPU model (`EngineKind::needs_gpu`) only with a usable Vulkan GPU.
+/// A CPU model runs everywhere, a GPU model (`EngineKind::needs_gpu`) only with a discrete Vulkan GPU.
 pub fn model_runs_here(info: &ModelInfo) -> bool {
     !info.engine.needs_gpu() || vulkan_gpu().is_some()
 }
@@ -429,25 +429,21 @@ pub fn engine_env() -> Vec<(String, String)> {
     }
 }
 
-/// The Vulkan device for a GPU model, as its index in the driver's device list: the first discrete GPU,
-/// else the first integrated one. None without a Vulkan driver or with only CPU devices (Mesa's
-/// llvmpipe and lavapipe), where parakeet.cpp would run about ten times slower than a CPU model.
-fn vulkan_gpu() -> Option<u32> {
-    static GPU: std::sync::OnceLock<Option<u32>> = std::sync::OnceLock::new();
+/// The Vulkan device for a GPU model, as its index in the driver's device list: the first discrete GPU.
+/// On an integrated GPU Fluid Speech Mini ran about 3 times slower than Parakeet TDT v2 on the same CPU
+/// (docs/linux.md), and Mesa's llvmpipe and lavapipe are CPU devices, slower still.
+fn vulkan_gpu() -> Option<usize> {
+    static GPU: std::sync::OnceLock<Option<usize>> = std::sync::OnceLock::new();
     *GPU.get_or_init(|| {
         let kinds = vulkan_device_types().unwrap_or_default();
-        let gpu = best_gpu(&kinds);
+        let gpu = discrete_gpu(&kinds);
         log::info!("Vulkan devices {kinds:?}, GPU for GPU models: {gpu:?}");
         gpu
     })
 }
 
-fn best_gpu(kinds: &[ash::vk::PhysicalDeviceType]) -> Option<u32> {
-    use ash::vk::PhysicalDeviceType as Kind;
-    [Kind::DISCRETE_GPU, Kind::INTEGRATED_GPU]
-        .iter()
-        .find_map(|want| kinds.iter().position(|k| k == want))
-        .and_then(|i| u32::try_from(i).ok())
+fn discrete_gpu(kinds: &[ash::vk::PhysicalDeviceType]) -> Option<usize> {
+    kinds.iter().position(|k| *k == ash::vk::PhysicalDeviceType::DISCRETE_GPU)
 }
 
 /// The type of each Vulkan device, in the order that ggml's `GGML_VK_VISIBLE_DEVICES` counts them.
@@ -470,7 +466,7 @@ fn vulkan_device_types() -> Option<Vec<ash::vk::PhysicalDeviceType>> {
 #[cfg(test)]
 mod tests {
     // Not `super::*`: that brings GPUI's own `test` macro into scope.
-    use super::{best_gpu, passwd_name};
+    use super::{discrete_gpu, passwd_name};
     use ash::vk::PhysicalDeviceType as Kind;
 
     #[test]
@@ -482,11 +478,12 @@ mod tests {
     }
 
     #[test]
-    fn a_discrete_gpu_comes_first_and_a_cpu_device_never_counts() {
-        assert_eq!(best_gpu(&[Kind::INTEGRATED_GPU, Kind::DISCRETE_GPU]), Some(1));
-        assert_eq!(best_gpu(&[Kind::CPU, Kind::INTEGRATED_GPU]), Some(1));
-        assert_eq!(best_gpu(&[Kind::CPU]), None, "llvmpipe or lavapipe only");
-        assert_eq!(best_gpu(&[Kind::VIRTUAL_GPU, Kind::OTHER]), None);
-        assert_eq!(best_gpu(&[]), None);
+    fn only_a_discrete_gpu_counts() {
+        assert_eq!(discrete_gpu(&[Kind::INTEGRATED_GPU, Kind::DISCRETE_GPU]), Some(1));
+        assert_eq!(discrete_gpu(&[Kind::DISCRETE_GPU, Kind::DISCRETE_GPU]), Some(0));
+        assert_eq!(discrete_gpu(&[Kind::CPU, Kind::INTEGRATED_GPU]), None, "an integrated GPU only");
+        assert_eq!(discrete_gpu(&[Kind::CPU]), None, "llvmpipe or lavapipe only");
+        assert_eq!(discrete_gpu(&[Kind::VIRTUAL_GPU, Kind::OTHER]), None);
+        assert_eq!(discrete_gpu(&[]), None);
     }
 }

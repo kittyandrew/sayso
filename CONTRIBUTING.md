@@ -136,7 +136,7 @@ cargo test -p sayso-enhance --test real_cli -- --ignored   # real claude command
 
 CI runs `scripts/check-deps.sh` on each push to `main` and on each pull request. It does not run the tests or clippy, because a GPUI build takes minutes. A maintainer starts the test jobs (macOS, Linux, and Windows) by hand with `gh workflow run ci.yml`. So run the checks above on your computer, and say in the pull request which checks you ran, and on which platform.
 
-A pull request that changes the Linux packaging (`packaging/linux`, `scripts/bundle-linux.sh`, `scripts/package-linux.sh`, `scripts/linux-deps.sh`, or `linux.yml`) also runs the Linux packages workflow. It builds the packages for both architectures, installs the `.deb`, and starts Sayso on a virtual display.
+A pull request that changes the Linux packaging (`packaging/linux`, `scripts/bundle-linux.sh`, `scripts/package-linux.sh`, `scripts/linux-deps.sh`, `scripts/linux-vulkan-deps.sh`, or `linux.yml`) also runs the Linux packages workflow. It builds the packages for both architectures, installs the `.deb`, and starts Sayso on a virtual display.
 
 ## Layout
 

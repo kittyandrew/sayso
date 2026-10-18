@@ -184,7 +184,7 @@ impl EngineClient {
         Self::spawn_with(engine_path, models_dir, cache_dir, Options::default())
     }
 
-    /// Like [`EngineClient::spawn`], with explicit timing options.
+    /// Like [`EngineClient::spawn`], with explicit options: timing, and environment for the sidecar.
     pub fn spawn_with(
         engine_path: PathBuf,
         models_dir: PathBuf,

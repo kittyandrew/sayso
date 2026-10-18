@@ -1,19 +1,19 @@
 //! The final pass of `parakeet_cpp` models: a Parakeet TDT GGUF on parakeet.cpp (ggml), on the GPU through
-//! Vulkan. Without a GPU such a model refuses to load. `build.rs` builds parakeet.cpp and links it statically
-//! (feature `parakeet`, Linux); without the feature, such a model fails to load with a clear error.
+//! Vulkan. Without a discrete GPU such a model refuses to load. `build.rs` builds parakeet.cpp and links
+//! it statically (feature `parakeet`, Linux); without the feature, loading one fails with a clear error.
 
 use crate::recognizer::FinalPass;
 use anyhow::Result;
 use std::path::Path;
 use std::sync::Arc;
 
-/// The load of a GPU model found no GPU. The `reason` of the `failed` state is `no_gpu` for it.
+/// The load of a GPU model found no discrete GPU. The `reason` of the `failed` state is `no_gpu` for it.
 #[derive(Debug)]
 pub struct NoGpu;
 
 impl std::fmt::Display for NoGpu {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("this model needs a GPU with a Vulkan driver, and none was found")
+        f.write_str("this model needs a discrete GPU with a Vulkan driver, and none was found")
     }
 }
 
@@ -35,6 +35,7 @@ mod imp {
     use super::*;
     use anyhow::{Context, anyhow};
     use std::ffi::{CStr, CString, c_char, c_int, c_void};
+    use std::os::unix::ffi::OsStrExt as _;
     use std::sync::Mutex;
 
     const SAMPLE_RATE: c_int = 16_000;
@@ -44,7 +45,7 @@ mod imp {
         _private: [u8; 0],
     }
 
-    // third_party/parakeet.cpp/include/parakeet_capi.h, linked statically by build.rs.
+    // parakeet.cpp's include/parakeet_capi.h, linked statically by build.rs.
     unsafe extern "C" {
         fn parakeet_capi_load(gguf_path: *const c_char) -> *mut RawContext;
         fn parakeet_capi_load_error() -> *const c_char;
@@ -59,20 +60,24 @@ mod imp {
         fn parakeet_capi_last_error(ctx: *mut RawContext) -> *const c_char;
         fn parakeet_capi_free_string(s: *mut c_char);
         // ggml-backend.h, linked with it.
-        fn ggml_backend_dev_by_type(kind: c_int) -> *mut c_void;
+        fn ggml_backend_dev_count() -> usize;
+        fn ggml_backend_dev_get(index: usize) -> *mut c_void;
+        fn ggml_backend_dev_type(device: *mut c_void) -> c_int;
     }
 
-    /// `enum ggml_backend_dev_type`: a GPU with its own memory, and an integrated one.
+    // `enum ggml_backend_dev_type`. ggml-vulkan lists an integrated GPU as IGPU and any other device as GPU.
     const GGML_BACKEND_DEVICE_TYPE_GPU: c_int = 1;
     const GGML_BACKEND_DEVICE_TYPE_IGPU: c_int = 2;
 
-    /// ggml's Vulkan backend lists discrete and integrated GPUs, not software drivers such as lavapipe.
+    /// The device parakeet.cpp picks, the first GPU or IGPU in ggml's list, is not an integrated GPU. The
+    /// list follows the Vulkan device order, where Mesa can put a laptop's integrated GPU first; the app's
+    /// `GGML_VK_VISIBLE_DEVICES` leaves only the discrete one in it.
     fn has_gpu() -> bool {
-        // SAFETY: registry lookups with no preconditions; the result is only compared with NULL.
-        unsafe {
-            !ggml_backend_dev_by_type(GGML_BACKEND_DEVICE_TYPE_GPU).is_null()
-                || !ggml_backend_dev_by_type(GGML_BACKEND_DEVICE_TYPE_IGPU).is_null()
-        }
+        // SAFETY: registry lookups with no preconditions, at indexes below the count.
+        let first = (0..unsafe { ggml_backend_dev_count() })
+            .map(|i| unsafe { ggml_backend_dev_type(ggml_backend_dev_get(i)) })
+            .find(|t| matches!(*t, GGML_BACKEND_DEVICE_TYPE_GPU | GGML_BACKEND_DEVICE_TYPE_IGPU));
+        first == Some(GGML_BACKEND_DEVICE_TYPE_GPU)
     }
 
     /// An owned parakeet.cpp context, behind a mutex: the library queues concurrent calls but keeps only
@@ -95,12 +100,12 @@ mod imp {
     }
 
     pub fn load(model: &Path) -> Result<Arc<dyn FinalPass>> {
-        // Without a GPU parakeet.cpp runs on the CPU, where Fluid Speech Mini took 19 s for 58 s of speech: a
-        // sherpa-onnx model is the better choice there.
+        // parakeet.cpp would fall back to an integrated GPU (about 3 times slower than a sherpa-onnx model on
+        // the CPU) or to the CPU (19 s for 58 s of speech): a sherpa-onnx model is the better choice there.
         if !has_gpu() {
             return Err(NoGpu.into());
         }
-        let path = CString::new(model.to_string_lossy().as_bytes())
+        let path = CString::new(model.as_os_str().as_bytes())
             .context("the model path has a NUL byte")?;
         // SAFETY: a valid C string; the result is NULL or a context we own.
         let raw = unsafe { parakeet_capi_load(path.as_ptr()) };

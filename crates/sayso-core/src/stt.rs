@@ -35,7 +35,7 @@ pub enum EngineReason {
     DownloadFailed,
     /// The model is on disk, but loading it failed.
     LoadFailed,
-    /// The model needs a GPU with a Vulkan driver, and the engine found none.
+    /// The model needs a discrete GPU with a Vulkan driver, and the engine found none.
     NoGpu,
     /// This Mac does not support Apple Intelligence.
     DeviceNotEligible,

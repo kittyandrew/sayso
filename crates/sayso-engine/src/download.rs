@@ -19,14 +19,14 @@ pub const DEFAULT_BASE_URL: &str =
 pub const PROGRESS_INTERVAL: Duration = Duration::from_millis(250);
 
 /// Hugging Face, where a `ParakeetCpp` model's GGUF file comes from.
-pub const DEFAULT_HF_URL: &str = "https://huggingface.co";
+pub const DEFAULT_HF_ENDPOINT: &str = "https://huggingface.co";
 
 pub fn archive_url(base_url: &str, archive: &str) -> String {
     format!("{}/{archive}.tar.bz2", base_url.trim_end_matches('/'))
 }
 
-pub fn hf_file_url(hf_url: &str, repo: &str, revision: &str, file: &str) -> String {
-    format!("{}/{repo}/resolve/{revision}/{file}", hf_url.trim_end_matches('/'))
+pub fn hf_file_url(hf_endpoint: &str, repo: &str, revision: &str, file: &str) -> String {
+    format!("{}/{repo}/resolve/{revision}/{file}", hf_endpoint.trim_end_matches('/'))
 }
 
 /// An HTTP agent for archives. It follows redirects (GitHub release files redirect).
@@ -39,12 +39,14 @@ pub fn agent() -> ureq::Agent {
     ureq::Agent::new_with_config(config)
 }
 
-/// Download the archive at `url` and extract it to `dest`. `staging` is a
+/// Download the archive at `url` and extract it to `dest`, or with `file`, put
+/// the file at `url` in the folder `dest` under that name. `staging` is a
 /// temporary folder beside `dest`. `on_bytes` gets the size of each piece
 /// that arrives.
-pub fn fetch_archive(
+pub fn fetch(
     agent: &ureq::Agent,
     url: &str,
+    file: Option<&str>,
     staging: &Path,
     dest: &Path,
     on_bytes: &mut dyn FnMut(u64),
@@ -52,29 +54,11 @@ pub fn fetch_archive(
     remove_dir_if_exists(staging)?;
     std::fs::create_dir_all(staging)
         .with_context(|| format!("cannot create {}", staging.display()))?;
-    let result = download_and_extract(agent, url, staging, on_bytes)
-        .and_then(|()| move_into_place(staging, dest));
-    if result.is_err() {
-        let _ = std::fs::remove_dir_all(staging);
+    let result = match file {
+        Some(name) => download_to_file(agent, url, &staging.join(name), on_bytes),
+        None => download_and_extract(agent, url, staging, on_bytes),
     }
-    result
-}
-
-/// Download the file at `url` into the folder `dest` as `name`. `staging` and
-/// `on_bytes` work as for [`fetch_archive`].
-pub fn fetch_file(
-    agent: &ureq::Agent,
-    url: &str,
-    name: &str,
-    staging: &Path,
-    dest: &Path,
-    on_bytes: &mut dyn FnMut(u64),
-) -> Result<()> {
-    remove_dir_if_exists(staging)?;
-    std::fs::create_dir_all(staging)
-        .with_context(|| format!("cannot create {}", staging.display()))?;
-    let result = download_to_file(agent, url, &staging.join(name), on_bytes)
-        .and_then(|()| move_into_place(staging, dest));
+    .and_then(|()| move_into_place(staging, dest));
     if result.is_err() {
         let _ = std::fs::remove_dir_all(staging);
     }
@@ -274,5 +258,6 @@ mod tests {
     fn urls_join_base_and_archive() {
         assert_eq!(archive_url("http://h/x/", "a-b"), "http://h/x/a-b.tar.bz2");
         assert!(archive_url(DEFAULT_BASE_URL, "a").starts_with("https://github.com/"));
+        assert_eq!(hf_file_url("http://h/", "o/r", "c0ffee", "m.gguf"), "http://h/o/r/resolve/c0ffee/m.gguf");
     }
 }

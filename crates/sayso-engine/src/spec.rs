@@ -60,7 +60,7 @@ impl Recipe {
 pub struct ModelSpec {
     pub recipe: Recipe,
     /// The main archive's folder in the model's store: the archive name in the
-    /// sherpa-onnx `asr-models` release, without `.tar.bz2`, or the GGUF's file name.
+    /// sherpa-onnx `asr-models` release, without `.tar.bz2`, or the GGUF's commit.
     pub archive: String,
     /// Where the main archive comes from.
     pub source: Source,
@@ -72,8 +72,9 @@ pub struct ModelSpec {
 pub enum Source {
     /// A `.tar.bz2` in the sherpa-onnx release.
     SherpaRelease,
-    /// One file in a Hugging Face repository at one commit, stored in the archive's folder.
-    HuggingFace { repo: String, revision: String, file: String },
+    /// `file` in a Hugging Face repository at the commit `archive`. A new commit gets a new folder, so
+    /// it downloads again even when the file keeps its name.
+    HuggingFace { repo: String, file: String },
 }
 
 impl ModelSpec {
@@ -99,14 +100,11 @@ impl ModelSpec {
                 preview_archive,
             } => {
                 check_repo(&repo)?;
-                check_archive_name(&revision)?;
-                if !file.ends_with(".gguf") {
-                    bail!("{file:?} is not a GGUF file");
-                }
+                check_archive_name(&file)?;
                 ModelSpec {
                     recipe: Recipe::ParakeetGguf,
-                    archive: file.clone(),
-                    source: Source::HuggingFace { repo, revision, file },
+                    archive: revision,
+                    source: Source::HuggingFace { repo, file },
                     preview_archive,
                 }
             }
@@ -199,25 +197,9 @@ mod tests {
         }))
         .unwrap();
         assert_eq!(spec.recipe, Recipe::ParakeetGguf);
-        assert_eq!(
-            spec.source,
-            Source::HuggingFace { repo: "o/r".into(), revision: "c0ffee".into(), file: "m.gguf".into() }
-        );
-        assert_eq!(spec.archives(), vec!["m.gguf", "p"]);
+        assert_eq!(spec.source, Source::HuggingFace { repo: "o/r".into(), file: "m.gguf".into() });
+        assert_eq!(spec.archives(), vec!["c0ffee", "p"]);
         assert_eq!(spec.stream_archive(), Some("p"));
-        let bad = [
-            ("o", "c0ffee", "m.gguf"),
-            ("o/r/x", "c0ffee", "m.gguf"),
-            ("../r", "c0ffee", "m.gguf"),
-            ("o/r", "c0ffee", "m.bin"),
-            ("o/r", "c0ffee", "../m.gguf"),
-            ("o/r", "../main", "m.gguf"),
-            ("o/r", "", "m.gguf"),
-        ];
-        for (repo, revision, file) in bad {
-            let value = json!({"kind": "parakeet_cpp", "repo": repo, "revision": revision, "file": file, "preview_archive": null});
-            assert!(ModelSpec::from_json(&value).is_err(), "{repo} {revision} {file}");
-        }
     }
 
     #[test]
@@ -247,6 +229,18 @@ mod tests {
         for bad in ["../x", "a/b", ".hidden", ""] {
             let value = json!({"kind": "sherpa", "recipe": "whisper", "archive": bad, "preview_archive": null});
             assert!(ModelSpec::from_json(&value).is_err(), "{bad}");
+        }
+        let bad = [
+            ("o", "c0ffee", "m.gguf"),
+            ("o/r/x", "c0ffee", "m.gguf"),
+            ("../r", "c0ffee", "m.gguf"),
+            ("o/r", "c0ffee", "../m.gguf"),
+            ("o/r", "../main", "m.gguf"),
+            ("o/r", "", "m.gguf"),
+        ];
+        for (repo, revision, file) in bad {
+            let value = json!({"kind": "parakeet_cpp", "repo": repo, "revision": revision, "file": file, "preview_archive": null});
+            assert!(ModelSpec::from_json(&value).is_err(), "{repo} {revision} {file}");
         }
         let value =
             json!({"kind": "sherpa", "recipe": "nope", "archive": "a", "preview_archive": null});

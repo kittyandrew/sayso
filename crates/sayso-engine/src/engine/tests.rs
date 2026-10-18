@@ -187,7 +187,7 @@ fn harness(base_url: &str) -> Harness {
     harness_with(base_url, base_url)
 }
 
-fn harness_with(base_url: &str, hf_url: &str) -> Harness {
+fn harness_with(base_url: &str, hf_endpoint: &str) -> Harness {
     let dir = tempfile::tempdir().unwrap();
     let captured = Captured::default();
     let out = Arc::new(Output::new(Box::new(captured.clone())));
@@ -198,7 +198,7 @@ fn harness_with(base_url: &str, hf_url: &str) -> Harness {
     let config = Config {
         models_dir: dir.path().join("models"),
         base_url: base_url.to_string(),
-        hf_url: hf_url.to_string(),
+        hf_endpoint: hf_endpoint.to_string(),
         decode_interval: Duration::ZERO,
     };
     let engine = Arc::new(Engine::new(
@@ -412,7 +412,7 @@ fn a_gguf_model_downloads_its_file_from_hugging_face() {
     assert_eq!(last(&reply), &json!({"v": 1, "type": "ok", "id": "d1"}));
     assert_eq!(states(&reply).last().map(String::as_str), Some("downloaded"));
     let folder = h.models_dir().join("m");
-    assert_eq!(std::fs::read(folder.join("m.gguf").join("m.gguf")).unwrap(), b"gguf");
+    assert_eq!(std::fs::read(folder.join("c0ffee").join("m.gguf")).unwrap(), b"gguf");
     assert!(folder.join(preview).join("tokens.txt").is_file());
 
     // A file the repository does not have fails the download and marks nothing complete.
@@ -420,6 +420,24 @@ fn a_gguf_model_downloads_its_file_from_hugging_face() {
     let reply = h.call(json!({"v": 1, "type": "download", "id": "d2", "model": "n", "engine": missing}));
     assert_eq!(last(&reply)["type"], "error");
     assert!(!h.models_dir().join("n").join(".complete").exists());
+}
+
+#[test]
+fn a_new_gguf_revision_downloads_again() {
+    let server = serve_files(
+        vec![],
+        vec![
+            ("o/r/resolve/c0ffee/m.gguf".into(), b"old".to_vec()),
+            ("o/r/resolve/beef/m.gguf".into(), b"new".to_vec()),
+        ],
+    );
+    let h = harness_with(&server.base, &server.hf);
+    for (id, revision) in [("d1", "c0ffee"), ("d2", "beef")] {
+        let engine = json!({"kind": "parakeet_cpp", "repo": "o/r", "revision": revision, "file": "m.gguf", "preview_archive": null});
+        let reply = h.call(json!({"v": 1, "type": "download", "id": id, "model": "m", "engine": engine}));
+        assert_eq!(last(&reply)["type"], "ok", "{reply:?}");
+    }
+    assert_eq!(std::fs::read(h.models_dir().join("m").join("beef").join("m.gguf")).unwrap(), b"new");
 }
 
 #[test]

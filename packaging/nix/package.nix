@@ -36,7 +36,7 @@ stdenv.mkDerivation {
     libxcb
     libxkbcommon
     stdenv.cc.cc.lib
-    vulkan-loader # the engine links libvulkan.so.1 for parakeet.cpp
+    vulkan-loader # the engine links libvulkan.so.1; autoPatchelf resolves that from here, not runtimeDependencies
   ];
   # The app loads these at run time (Wayland, and Vulkan with a GL fallback).
   runtimeDependencies = [

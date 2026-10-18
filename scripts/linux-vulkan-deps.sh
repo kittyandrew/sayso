@@ -7,6 +7,7 @@
 # releases have both in apt (scripts/linux-deps.sh). It needs the packages of scripts/linux-deps.sh, git
 # and python3. glslc runs on the architecture and glibc it was built on.
 set -euo pipefail
+[[ $# -eq 1 ]] || { echo "usage: $0 <folder>" >&2; exit 2; }
 vulkan_headers=v1.4.363
 shaderc=v2026.4 # its DEPS file pins the glslang, SPIRV-Tools and SPIRV-Headers commits
 prefix=$(realpath -m "$1")

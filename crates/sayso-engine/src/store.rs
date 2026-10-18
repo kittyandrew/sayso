@@ -4,7 +4,7 @@
 //!
 //! ```text
 //! <model id>/
-//!   <archive>/            the extracted archive, renamed into place when complete
+//!   <archive>/            the extracted archive, or a GGUF's commit with the file, renamed into place when complete
 //!   <preview archive>/    the streaming archive, for a model with a live preview
 //!   .partial-<archive>/   an extraction in progress (deleted when it fails)
 //!   .complete             the archive names, one per line, written last

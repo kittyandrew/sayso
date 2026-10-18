@@ -95,14 +95,14 @@ pub fn catalog() -> Vec<ModelInfo> {
             }
             .build()
         },
-        // On the GPU: FluidVoice's 3-bit Parakeet TDT v3 student, as published for parakeet.cpp.
+        // On the GPU: FluidVoice's quantized Parakeet Ultra, in the GGUF it publishes for parakeet.cpp.
         {
             const REPO: &str = "FluidVoice-Labs/fluid-speech-mini-gguf";
             let info = Entry {
                 id: "fluid-speech-mini",
                 name: "Fluid Speech Mini",
                 vendor: "FluidVoice",
-                description: t!("core.model.fluid_speech_mini"),
+                description: t!("core.model.fluid_speech_mini_onnx"),
                 engine: EngineKind::ParakeetCpp {
                     repo: REPO.into(),
                     revision: "490bcd5de891f5efd0e732434dfb0a4b0899aead".into(),

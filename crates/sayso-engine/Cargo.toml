@@ -1,6 +1,6 @@
 [package]
 name = "sayso-engine"
-description = "Speech engine sidecar for Linux and Windows: sherpa-onnx models behind the NDJSON engine protocol."
+description = "Speech engine sidecar for Linux and Windows: sherpa-onnx and parakeet.cpp models behind the NDJSON engine protocol."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -34,7 +34,9 @@ libc = "0.2"
 [dependencies]
 workspace-hack.workspace = true
 
-[build-dependencies]
+# For parakeet.cpp (build.rs). A target table of build dependencies matches the
+# host, and each system builds its own release, so these stay out of other builds.
+[target.'cfg(target_os = "linux")'.build-dependencies]
 cmake = "0.1"
 flate2 = "1"
 sha2 = "0.10"

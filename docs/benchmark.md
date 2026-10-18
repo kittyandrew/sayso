@@ -9,7 +9,7 @@ The accuracy and speed figures on the Models page come from this benchmark. Says
 - **Accuracy:** the text and the reference go through Whisper's English normalizer, as on the leaderboard, so punctuation and capitals do not count. WER is over all words of a set. The page shows 100 minus the mean of the seven set WERs.
 - **Speed:** audio time over processing time (RTFx), from the time that the sidecar reports.
 - **Live preview:** for Parakeet Unified EN, whose preview runs another decoder than its final pass, a second run streams each clip and scores the last preview text.
-- **Machine:** Apple M5 Pro, macOS 27.0. Windows and Linux run other builds. They show the same accuracy figures and no speed figures, except Fluid Speech Mini on Linux (see "Linux").
+- **Machine:** Apple M5 Pro, macOS 27.0. Windows and Linux run other builds. They show the same accuracy figures and no speed figures. Fluid Speech Mini on Linux shows its own accuracy figure (see "Linux").
 
 ## Run it again
 

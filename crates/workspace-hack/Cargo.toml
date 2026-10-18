@@ -42,7 +42,6 @@ winnow-ca01ad9e24f5d932 = { package = "winnow", version = "0.7" }
 aho-corasick = { version = "1" }
 anstyle = { version = "1" }
 base64 = { version = "0.23" }
-crc32fast = { version = "1" }
 hashbrown = { version = "0.17", default-features = false, features = ["default-hasher"] }
 log = { version = "0.4", default-features = false, features = ["std"] }
 memchr = { version = "2" }
@@ -55,12 +54,9 @@ rust-i18n-support = { version = "4", default-features = false, features = ["code
 semver = { version = "1", features = ["serde"] }
 serde = { version = "1", features = ["derive"] }
 serde_core = { version = "1", features = ["alloc"] }
-simd-adler32 = { version = "0.3" }
 smallvec = { version = "1", default-features = false, features = ["const_generics"] }
-subtle = { version = "2", default-features = false, features = ["const-generics"] }
 syn-7b89eefb6aaa9bf3 = { package = "syn", version = "3", features = ["extra-traits", "fold", "visit"] }
 typenum = { version = "1", default-features = false, features = ["const-generics"] }
-ureq = { version = "3", features = ["json"] }
 winnow-ca01ad9e24f5d932 = { package = "winnow", version = "0.7" }
 
 [target.aarch64-apple-darwin.dependencies]
@@ -72,13 +68,9 @@ objc2 = { version = "0.6" }
 objc2-core-foundation = { version = "0.3" }
 objc2-core-graphics = { version = "0.3", default-features = false, features = ["CGColor", "CGColorSpace", "CGContext", "CGDirectDisplay", "CGEventTypes", "CGFont", "CGImage", "CGPath", "objc2", "std"] }
 once_cell = { version = "1" }
-rustix = { version = "1", features = ["fs"] }
 
 [target.aarch64-apple-darwin.build-dependencies]
-bitflags = { version = "2", default-features = false, features = ["serde", "std"] }
 libc = { version = "0.2" }
-once_cell = { version = "1" }
-rustix = { version = "1", features = ["fs"] }
 
 [target.aarch64-unknown-linux-gnu.dependencies]
 bitflags = { version = "2", default-features = false, features = ["std"] }
@@ -107,6 +99,7 @@ zeroize = { version = "1", features = ["zeroize_derive"] }
 bitflags = { version = "2", default-features = false, features = ["std"] }
 byteorder = { version = "1" }
 cc = { version = "1", default-features = false, features = ["parallel"] }
+crc32fast = { version = "1" }
 crossbeam-utils = { version = "0.8", default-features = false, features = ["std"] }
 digest-93f6ce9d446188ac = { package = "digest", version = "0.10", features = ["mac", "std"] }
 digest-a6292c17cd707f01 = { package = "digest", version = "0.11", features = ["alloc", "mac", "oid"] }
@@ -115,11 +108,14 @@ libc = { version = "0.2", features = ["extra_traits"] }
 linux-raw-sys = { version = "0.12", default-features = false, features = ["auxvec", "elf", "errno", "general", "if_ether", "ioctl", "net", "netlink", "no_std", "prctl", "system", "xdp"] }
 once_cell = { version = "1" }
 rustix = { version = "1", features = ["event", "fs", "net", "pipe", "process", "system", "time"] }
+simd-adler32 = { version = "0.3" }
 smallvec = { version = "1", default-features = false, features = ["const_new", "union"] }
+subtle = { version = "2", default-features = false, features = ["const-generics"] }
 syn-7b89eefb6aaa9bf3 = { package = "syn", version = "3", default-features = false, features = ["full", "visit-mut"] }
 syn-f595c2ba2a3f28df = { package = "syn", version = "2", features = ["extra-traits", "full", "visit", "visit-mut"] }
 time = { version = "0.3", features = ["formatting", "parsing"] }
 toml_parser = { version = "1" }
+ureq = { version = "3", features = ["json"] }
 winnow-dff4ba8e3ae991db = { package = "winnow", version = "1" }
 zeroize = { version = "1", features = ["zeroize_derive"] }
 
@@ -150,6 +146,7 @@ zeroize = { version = "1", features = ["zeroize_derive"] }
 bitflags = { version = "2", default-features = false, features = ["std"] }
 byteorder = { version = "1" }
 cc = { version = "1", default-features = false, features = ["parallel"] }
+crc32fast = { version = "1" }
 crossbeam-utils = { version = "0.8", default-features = false, features = ["std"] }
 digest-93f6ce9d446188ac = { package = "digest", version = "0.10", features = ["mac", "std"] }
 digest-a6292c17cd707f01 = { package = "digest", version = "0.11", features = ["alloc", "mac", "oid"] }
@@ -158,11 +155,14 @@ libc = { version = "0.2", features = ["extra_traits"] }
 linux-raw-sys = { version = "0.12", default-features = false, features = ["auxvec", "elf", "errno", "general", "if_ether", "ioctl", "net", "netlink", "no_std", "prctl", "system", "xdp"] }
 once_cell = { version = "1" }
 rustix = { version = "1", features = ["event", "fs", "net", "pipe", "process", "system", "time"] }
+simd-adler32 = { version = "0.3" }
 smallvec = { version = "1", default-features = false, features = ["const_new", "union"] }
+subtle = { version = "2", default-features = false, features = ["const-generics"] }
 syn-7b89eefb6aaa9bf3 = { package = "syn", version = "3", default-features = false, features = ["full", "visit-mut"] }
 syn-f595c2ba2a3f28df = { package = "syn", version = "2", features = ["extra-traits", "full", "visit", "visit-mut"] }
 time = { version = "0.3", features = ["formatting", "parsing"] }
 toml_parser = { version = "1" }
+ureq = { version = "3", features = ["json"] }
 winnow-dff4ba8e3ae991db = { package = "winnow", version = "1" }
 zeroize = { version = "1", features = ["zeroize_derive"] }
 
@@ -173,6 +173,7 @@ digest-93f6ce9d446188ac = { package = "digest", version = "0.10", features = ["m
 getrandom-468e82937335b1c9 = { package = "getrandom", version = "0.3", default-features = false, features = ["std", "wasm_js"] }
 getrandom-9fbad63c4bcf4a8f = { package = "getrandom", version = "0.4", default-features = false, features = ["std"] }
 once_cell = { version = "1" }
+percent-encoding = { version = "2" }
 time = { version = "0.3", features = ["formatting", "parsing"] }
 windows = { version = "0.62", features = ["Foundation_Collections", "Media_Control", "Win32_Devices_Properties", "Win32_Graphics_Dwm", "Win32_Graphics_Gdi", "Win32_Media_Audio", "Win32_Media_KernelStreaming", "Win32_Media_Multimedia", "Win32_Security_Authentication_Identity", "Win32_Storage_FileSystem", "Win32_System_Com_StructuredStorage", "Win32_System_DataExchange", "Win32_System_Diagnostics_ToolHelp", "Win32_System_Environment", "Win32_System_LibraryLoader", "Win32_System_Memory", "Win32_System_Ole", "Win32_System_Performance", "Win32_System_Registry", "Win32_System_SystemServices", "Win32_System_Threading", "Win32_System_Variant", "Win32_UI_Accessibility", "Win32_UI_HiDpi", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_Shell_PropertiesSystem", "Win32_UI_WindowsAndMessaging"] }
 windows-core = { version = "0.62" }
@@ -182,10 +183,14 @@ zeroize = { version = "1", features = ["zeroize_derive"] }
 [target.x86_64-pc-windows-msvc.build-dependencies]
 byteorder = { version = "1" }
 cc = { version = "1", default-features = false, features = ["parallel"] }
+crc32fast = { version = "1" }
 digest-93f6ce9d446188ac = { package = "digest", version = "0.10", features = ["mac", "std"] }
 getrandom-468e82937335b1c9 = { package = "getrandom", version = "0.3", default-features = false, features = ["std", "wasm_js"] }
 getrandom-9fbad63c4bcf4a8f = { package = "getrandom", version = "0.4", default-features = false, features = ["std"] }
 once_cell = { version = "1" }
+percent-encoding = { version = "2" }
+simd-adler32 = { version = "0.3" }
+subtle = { version = "2", default-features = false, features = ["const-generics"] }
 syn-f595c2ba2a3f28df = { package = "syn", version = "2", features = ["extra-traits", "full", "visit"] }
 time = { version = "0.3", features = ["formatting", "parsing"] }
 windows-sys = { version = "0.61", features = ["Win32_Globalization", "Win32_Graphics_Gdi", "Win32_Security_Credentials", "Win32_Storage_FileSystem", "Win32_System_Console", "Win32_System_LibraryLoader", "Win32_System_SystemInformation", "Win32_System_SystemServices", "Win32_UI_Accessibility", "Win32_UI_Controls", "Win32_UI_HiDpi", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }

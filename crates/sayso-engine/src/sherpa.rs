@@ -1,10 +1,10 @@
-//! The recognizer traits on sherpa-onnx. CPU only.
+//! The recognizer traits on sherpa-onnx, on the CPU. A GGUF model's final pass goes to `parakeet.rs`.
 
 use crate::layout::{self, OfflineFiles};
 use crate::partials::Segment;
 use crate::recognizer::{FinalPass, LivePreview, Loaded, Loader, ModelDirs, PreviewStream};
-use crate::spec::ModelSpec;
-use anyhow::{Result, anyhow, bail};
+use crate::spec::{ModelSpec, Recipe, Source};
+use anyhow::{Result, anyhow};
 use sherpa_onnx::{
     OfflineModelConfig, OfflineMoonshineModelConfig, OfflineNemoEncDecCtcModelConfig,
     OfflineRecognizer, OfflineRecognizerConfig, OfflineSenseVoiceModelConfig,
@@ -50,13 +50,13 @@ impl Loader for SherpaLoader {
         spec: &ModelSpec,
         dirs: &ModelDirs,
     ) -> Result<Option<Arc<dyn FinalPass>>> {
-        if !spec.recipe.final_pass() {
-            return Ok(None);
-        }
-        Ok(Some(match layout::offline_files(spec.recipe, &dirs.main)? {
-            OfflineFiles::Gguf { model } => crate::parakeet::load(&model)?,
-            files => Arc::new(Offline::load(files)?),
-        }))
+        Ok(if let Source::HuggingFace { file, .. } = &spec.source {
+            Some(crate::parakeet::load(&dirs.main.join(file))?)
+        } else if spec.recipe.final_pass() {
+            Some(Arc::new(Offline::load(spec.recipe, &dirs.main)?))
+        } else {
+            None
+        })
     }
 
     fn load(&self, spec: &ModelSpec, dirs: &ModelDirs) -> Result<Loaded> {
@@ -84,7 +84,8 @@ struct Offline {
 }
 
 impl Offline {
-    fn load(files: OfflineFiles) -> Result<Offline> {
+    fn load(recipe: Recipe, dir: &Path) -> Result<Offline> {
+        let files = layout::offline_files(recipe, dir)?;
         let language = "auto".to_string();
         let recognizer = Arc::new(create_offline(&files, &language)?);
         Ok(Offline {
@@ -194,9 +195,6 @@ fn create_offline(files: &OfflineFiles, language: &str) -> Result<OfflineRecogni
                 ..Default::default()
             };
             model.tokens = path(tokens);
-        }
-        OfflineFiles::Gguf { model: file } => {
-            bail!("{} is a GGUF model, which parakeet.cpp runs", file.display())
         }
         OfflineFiles::MoonshineV1 {
             preprocessor,

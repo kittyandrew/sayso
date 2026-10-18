@@ -15,8 +15,8 @@
 //! - Tray: `Tray` (with [`TrayEvent`]).
 //! - Files and system: `open`, `reveal`, `audio_player`, `user_full_name`, `model_runs_here`,
 //!   `engine_env` (extra environment for the speech engine), `open_requested` (a second start of
-//!   Sayso asked to open the Hub). Windows plays
-//!   audio in its own process, so it has `play_wav` and `stop_wav` and no `audio_player`.
+//!   Sayso asked to open the Hub). Windows plays audio in its own process, so it has `play_wav` and
+//!   `stop_wav` and no `audio_player`.
 //!
 //! Coordinates are global screen points with the origin at the bottom left of
 //! the primary display and y up (the Cocoa convention). A backend for a

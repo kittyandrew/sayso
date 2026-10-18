@@ -1,5 +1,5 @@
-//! Without a Vulkan GPU, a `parakeet_cpp` model fails to load with the reason `no_gpu`, and the engine
-//! keeps running. `VK_DRIVER_FILES` names no driver, so this holds on a computer with a GPU too.
+//! Without a discrete Vulkan GPU, a `parakeet_cpp` model fails to load with the reason `no_gpu`, and the
+//! engine keeps running. `VK_DRIVER_FILES` names no driver, so this holds on a computer with a GPU too.
 
 #![cfg(all(target_os = "linux", feature = "parakeet"))]
 
@@ -9,11 +9,11 @@ use std::process::{Command, Stdio};
 #[test]
 fn a_gpu_model_without_a_gpu_fails_with_no_gpu() {
     let dir = tempfile::tempdir().unwrap();
-    // A downloaded model as the engine leaves it: the GGUF in a folder of its name, and the marker.
+    // A downloaded model as the engine leaves it: the GGUF in a folder named by its commit, and the marker.
     let folder = dir.path().join("m");
-    std::fs::create_dir_all(folder.join("m.gguf")).unwrap();
-    std::fs::write(folder.join("m.gguf").join("m.gguf"), b"not read: the GPU check comes first").unwrap();
-    std::fs::write(folder.join(".complete"), "m.gguf\n").unwrap();
+    std::fs::create_dir_all(folder.join("c0ffee")).unwrap();
+    std::fs::write(folder.join("c0ffee").join("m.gguf"), b"not read: the GPU check comes first").unwrap();
+    std::fs::write(folder.join(".complete"), "c0ffee\n").unwrap();
 
     let mut child = Command::new(env!("CARGO_BIN_EXE_sayso-engine"))
         .env("SAYSO_MODELS_DIR", dir.path())
